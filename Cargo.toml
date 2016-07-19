@@ -4,5 +4,5 @@ version = "0.1.0"
 authors = ["David Holland <davidthenameless@gmail.com>"]
 
 [dependencies]
-sdl2 = "0.21.0"
-gl = "0.6.1"
+imgui = {path = "extlib/imgui-rs", features = ["glium"]}
+
