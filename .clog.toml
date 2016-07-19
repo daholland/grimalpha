@@ -1,0 +1,8 @@
+[clog]
+repository = "https://gitlab.com/daholland/grimalpha"
+
+subtitle = "turn and face the strange"
+
+link-style = "gitlab"
+
+changelog = "ChangeLog.md"
