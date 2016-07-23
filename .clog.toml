@@ -6,3 +6,6 @@ subtitle = "turn and face the strange"
 link-style = "gitlab"
 
 changelog = "ChangeLog.md"
+
+[sections]
+Chore = ["refactor", "chore"]

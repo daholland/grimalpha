@@ -1,4 +1,7 @@
-
+#[derive(Debug)]
+pub struct SteamAPI {
+    pub loaded: bool,
+}
 
 #[link(name = "steam_api64", kind = "static")]
 extern "C" {
