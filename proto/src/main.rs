@@ -3,6 +3,7 @@
 
 #[macro_use] mod app;
 mod steamworks;
+mod util;
 use app::*;
 
 #[derive(Copy, Clone)]
@@ -15,6 +16,7 @@ implement_vertex!(Vertex, pos);
 
 
 fn main() {
+    util::test();
     let mut padstate = input::JoyPadState::new();
     let mut app = App::init();
 
@@ -22,14 +24,25 @@ fn main() {
 
         unsafe {
             let result = input::XInputGetState(0, &mut padstate);
-            println!("result: {:?}, padstate: {:?}", result, padstate);
+            //println!("result: {:?}, padstate: {:?}", result, padstate);
         }
 
         for ev in app.display.poll_events() {
             {
-                use glium::glutin::Event;
+                use glium::glutin::{Event, ElementState, MouseButton};
+                
+                if let Event::Closed = ev {
+                    break 'outer
+                };
 
-                if let Event::Closed = ev { break 'outer };
+                if let Event::MouseMoved(x, y) = ev {
+                    app.mouse_pos = (x, y)
+                };
+
+
+                if let Event::MouseInput(state, MouseButton::Left) = ev {
+                    app.mouse_pressed.0 = state == ElementState::Pressed
+                }
             
             }
         }

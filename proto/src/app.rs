@@ -1,10 +1,10 @@
 extern crate glium;
 extern crate time;
 extern crate winapi;
+extern crate imgui_sys;
 
 // TODO: split out into own mod for Support/Systems holder
 use glium::backend::glutin_backend::GlutinFacade;
-use glium::glutin;
 use imgui::{ImGui, ImGuiKey, Ui};
 use imgui::glium_renderer::Renderer;
 
@@ -23,6 +23,9 @@ pub struct App {
     log: (),
     event_sys: (),
     resource_sys: (),
+    pub mouse_pos: (i32, i32),
+    pub mouse_pressed: (bool, bool, bool),
+    pub mouse_wheel: f32,
 }
 
 struct AppBuilder;
@@ -79,11 +82,20 @@ color = vec4(1.0, 0.0, 0.0, 1.0);
             steam_api: steam_api,
             log: (),
             event_sys: (),
-            resource_sys: ()
-             
-             
+            resource_sys: (),
+            mouse_pos: (0,0),
+            mouse_pressed: (false, false, false),
+            mouse_wheel: 0.0,             
         }
     }
+    pub fn update_mouse(&mut self) {
+        let scale = self.ui_sys.display_framebuffer_scale();
+        self.ui_sys.set_mouse_pos(self.mouse_pos.0 as f32 / scale.0, self.mouse_pos.1 as f32 / scale.1 );
+        self.ui_sys.set_mouse_down(&[self.mouse_pressed.0, self.mouse_pressed.1, self.mouse_pressed.2, false, false]);
+        self.ui_sys.set_mouse_wheel(self.mouse_wheel / scale.1);
+        self.mouse_wheel = 0.0;
+    }
+
     pub fn render<F:FnMut(&Ui)>(&mut self, clear_color: (f32,f32,f32,f32), mut run_ui: F)
         where F:FnMut(&Ui) {
         use glium::*;
@@ -91,6 +103,7 @@ color = vec4(1.0, 0.0, 0.0, 1.0);
         let delta = now - self.last_frame;
         let delta_f = delta.num_nanoseconds().unwrap() as f32/ 1_000_000_000.0;
         self.last_frame = now;
+        self.update_mouse();
 
         //begin draw
         let mut target = self.display.draw();
@@ -122,13 +135,19 @@ color = vec4(1.0, 0.0, 0.0, 1.0);
 
         target.finish().unwrap();
         
-        
     }
 }
 pub mod ui {
-    use imgui::{Ui, ImGuiSetCond_FirstUseEver};
+    use imgui::{Ui, ImGuiSetCond_FirstUseEver, ImVec2, ImStr};
+    use super::imgui_sys::{igInvisibleButton};
+    
+    pub struct UiState {
+        
+    }
+    
     pub fn hello_world(ui: &Ui) {
         ui.window(im_str!("Hello world!"))
+            .movable(true)
             .size((300.0, 100.0), ImGuiSetCond_FirstUseEver)
             .build(|| {
                 ui.text(im_str!("Hello world"));
@@ -136,11 +155,23 @@ pub mod ui {
                 ui.separator();
                 ui.text(im_str!("asdfasdf"));
 
-        });
+                let mut opened = &mut ui.small_button(im_str!("open canvas"));
+                
+
+                ui.window(im_str!("Canvas"))
+                    .movable(true)
+                    .size((300.0, 100.0), ImGuiSetCond_FirstUseEver)
+                    .opened(opened)
+                    .build(|| {
+                        
+                       //  let mut colorpick: [f32; 4] = [0.0,0.0,0.0,0.0];
+                             ui.text(im_str!("Test Window! Haha!"));
+                    //         ui.color_edit4(im_str!("Pickcolor"), &mut colorpick).build(); 
+                     });
+            });
     }
+
 }
-
-
 pub mod input {
 
 use super::winapi::*;
