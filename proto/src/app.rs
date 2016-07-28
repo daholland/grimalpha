@@ -1,6 +1,5 @@
 extern crate glium;
 extern crate time;
-extern crate winapi;
 extern crate imgui_sys;
 
 // TODO: split out into own mod for Support/Systems holder
@@ -11,62 +10,105 @@ use imgui::glium_renderer::Renderer;
 use self::time::SteadyTime;
 
 use steamworks::{SteamAPI, SteamAPI_Init};
+use ::ui as ui;
+use ::input as input;
 
 pub struct App {
     last_frame: SteadyTime,
     pub display: GlutinFacade,
     pub ui_sys: ImGui,
-    pub ui_state: (),
+    pub ui_state: ui::UiState,
     renderer: Renderer,
     shader: glium::Program,
     pub steam_api: Option<SteamAPI>,
     log: (),
     event_sys: (),
     resource_sys: (),
-    pub mouse_pos: (i32, i32),
-    pub mouse_pressed: (bool, bool, bool),
-    pub mouse_wheel: f32,
+    pub game: Game,
+    pub input_state: input::InputState,
 }
 
-struct AppBuilder;
+use std::path::Path;
+
+struct AppConfig<'ac> {
+    root_path: Option<&'ac str>,
+    user_home_dir: Option<&'ac str>,
+    resource_path: Option<&'ac str>,
+    game_config: Option<&'ac str>
+}
+
+impl<'ac> AppConfig<'ac> {
+    
+}
+
+struct AppBuilder<'app> {
+    pub config: AppConfig<'app>,
+
+}
+
+impl<'app> AppBuilder<'app> {
+    pub fn new(config_path: Option<&'app str>) -> Self {
+        match config_path {
+            Some(path) => {
+                println!("Path found! {}", path);
+                AppBuilder {
+                    config: AppConfig {
+                        root_path: Some(path),
+                        user_home_dir: None,
+                        resource_path: None,
+                        game_config: None
+                    }
+                }
+            },
+            None => {
+                println!("No Path given!");
+                panic!();
+            }
+        }
+    }
+
+    
+}
+
+pub struct Game {
+state: f32
+}
 
 impl App {
     pub fn init() -> App {
         use glium::*;
-        let mut steam_api = None;
-
-        unsafe {
-            if SteamAPI_Init() {
-                steam_api = Some(SteamAPI {loaded: true })
-            };
-        }
-
 
         let display = glutin::WindowBuilder::new()
             .with_dimensions(960,540)
             .build_glium().
             unwrap();
+
         
         let mut imgui = ImGui::init();
         let renderer = Renderer::init(&mut imgui, &display).unwrap();
 
         imgui.set_imgui_key(ImGuiKey::A, 0);
-        
+
+
         let vert_shader_src = r#"
-        #version 140
-        in vec2 pos;
+#version 140
+in vec2 pos;
+out vec2 my_attr;
+
+uniform mat4 matrix;
 
 void main() {
-gl_Position = vec4(pos, 0.0, 1.0);
+  my_attr = pos;
+  gl_Position = matrix * vec4(pos, 0.0, 1.0);
 }
 "#;
         let frag_shader_src = r#"
 #version 140
-
+in vec2 my_attr;
 out vec4 color;
 
 void main() {
-color = vec4(1.0, 0.0, 0.0, 1.0);
+  color = vec4(my_attr, 0.0, 1.0);
 }
 "#;
 
@@ -75,35 +117,49 @@ color = vec4(1.0, 0.0, 0.0, 1.0);
         App {
             display: display.clone(),
             ui_sys: imgui,
-            ui_state: (),
+            ui_state: ui::UiState {
+                colorpick: [0.0,0.0,0.0,0.0],
+                show_color_window: true
+            },
             renderer: renderer,
             last_frame: SteadyTime::now(),
             shader: program,
-            steam_api: steam_api,
+            steam_api: None,
             log: (),
             event_sys: (),
             resource_sys: (),
-            mouse_pos: (0,0),
-            mouse_pressed: (false, false, false),
-            mouse_wheel: 0.0,             
+            game: Game {
+                state: -0.5
+            },
+            input_state: input::InputState {
+                mouse: input::MouseState {
+                    pos: (0,0),
+                    buttons: (false, false, false),
+                }
+            }
         }
     }
     pub fn update_mouse(&mut self) {
         let scale = self.ui_sys.display_framebuffer_scale();
-        self.ui_sys.set_mouse_pos(self.mouse_pos.0 as f32 / scale.0, self.mouse_pos.1 as f32 / scale.1 );
-        self.ui_sys.set_mouse_down(&[self.mouse_pressed.0, self.mouse_pressed.1, self.mouse_pressed.2, false, false]);
-        self.ui_sys.set_mouse_wheel(self.mouse_wheel / scale.1);
-        self.mouse_wheel = 0.0;
+        self.ui_sys.set_mouse_pos(self.input_state.mouse.pos.0 as f32 / scale.0,
+                                  self.input_state.mouse.pos.1 as f32 / scale.1 );
+        self.ui_sys.set_mouse_down(&[self.input_state.mouse.buttons.0,
+                                     self.input_state.mouse.buttons.1, self.input_state.mouse.buttons.2, false, false]);
     }
 
-    pub fn render<F:FnMut(&Ui)>(&mut self, clear_color: (f32,f32,f32,f32), mut run_ui: F)
-        where F:FnMut(&Ui) {
+    pub fn render<F: FnMut(&Ui, &mut ui::UiState)>(&mut self, clear_color: (f32,f32,f32,f32), mut run_ui: F)
+        where F:FnMut(&Ui, &mut ui::UiState) {
         use glium::*;
         let now = SteadyTime::now();
         let delta = now - self.last_frame;
         let delta_f = delta.num_nanoseconds().unwrap() as f32/ 1_000_000_000.0;
         self.last_frame = now;
         self.update_mouse();
+
+        self.game.state += 0.0002;
+        if self.game.state > 0.5 {
+            self.game.state = -0.5
+        }
 
         //begin draw
         let mut target = self.display.draw();
@@ -117,7 +173,16 @@ color = vec4(1.0, 0.0, 0.0, 1.0);
         let vert_buffer = glium::VertexBuffer::new(&self.display, &shape).unwrap();
         let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
 
-        target.draw(&vert_buffer, &indices, &self.shader, &glium::uniforms::EmptyUniforms, &Default::default()).unwrap();
+        let t = self.game.state;
+        let uniforms = uniform! {
+            matrix: [
+                [t.cos(), t.sin(), 0.0, 0.0],
+                [-t.sin(), t.cos(), 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [t, 0.0, 0.0, 1.0f32],
+            ]  
+        };
+        target.draw(&vert_buffer, &indices, &self.shader, &uniforms, &Default::default()).unwrap();
 
 
         // ui render
@@ -127,8 +192,8 @@ color = vec4(1.0, 0.0, 0.0, 1.0);
         let size_px = window.get_inner_size_pixels().unwrap();
 
         let ui = self.ui_sys.frame(size_pts, size_px, delta_f);
-
-        run_ui(&ui);
+        
+        run_ui(&ui, &mut self.ui_state);
 
         self.renderer.render(&mut target, ui).unwrap();
         //finish draw call
@@ -137,92 +202,6 @@ color = vec4(1.0, 0.0, 0.0, 1.0);
         
     }
 }
-pub mod ui {
-    use imgui::{Ui, ImGuiSetCond_FirstUseEver, ImVec2, ImStr};
-    use super::imgui_sys::{igInvisibleButton};
-    
-    pub struct UiState {
-        
-    }
-    
-    pub fn hello_world(ui: &Ui) {
-        ui.window(im_str!("Hello world!"))
-            .movable(true)
-            .size((300.0, 100.0), ImGuiSetCond_FirstUseEver)
-            .build(|| {
-                ui.text(im_str!("Hello world"));
-                ui.text(im_str!("asdfasdf"));
-                ui.separator();
-                ui.text(im_str!("asdfasdf"));
 
-                let mut opened = &mut ui.small_button(im_str!("open canvas"));
-                
 
-                ui.window(im_str!("Canvas"))
-                    .movable(true)
-                    .size((300.0, 100.0), ImGuiSetCond_FirstUseEver)
-                    .opened(opened)
-                    .build(|| {
-                        
-                       //  let mut colorpick: [f32; 4] = [0.0,0.0,0.0,0.0];
-                             ui.text(im_str!("Test Window! Haha!"));
-                    //         ui.color_edit4(im_str!("Pickcolor"), &mut colorpick).build(); 
-                     });
-            });
-    }
-
-}
-pub mod input {
-
-use super::winapi::*;
-
-    #[link(name = "xinput")]
-    extern "system" {
-        pub fn XInputEnable(enable: BOOL);
-
-        pub fn XInputGetAudioDeviceIds(
-            dwUserIndex: DWORD, pRenderDeviceId: LPWSTR, pRenderCount: *mut UINT,
-            pCaptureDeviceId: LPWSTR, pCaptureCount: *mut UINT
-        ) -> DWORD;
-
-        pub fn XInputGetBatteryInformation(
-            dwUserIndex: DWORD, devType: BYTE, pBatteryInformation: *mut XINPUT_BATTERY_INFORMATION
-        ) -> DWORD;
-
-        pub fn XInputGetCapabilities(
-            dwUserIndex: DWORD, dwFlags: DWORD, pCapabilities: *mut XINPUT_CAPABILITIES
-        ) -> DWORD;
-
-        pub fn XInputGetDSoundAudioDeviceGuids(
-            dwUserIndex: DWORD, pDSoundRenderGuid: *mut GUID, pDSoundCaptureGuid: *mut GUID
-        ) -> DWORD;
-
-        pub fn XInputGetKeystroke(
-            dwUserIndex: DWORD, dwReserved: DWORD, pKeystroke: PXINPUT_KEYSTROKE
-        ) -> DWORD;
-
-        pub fn XInputGetState(dwUserIndex: DWORD, pState: *mut XINPUT_STATE) -> DWORD;
-
-        pub fn XInputSetState(dwUserIndex: DWORD, pVibration: *mut XINPUT_VIBRATION) -> DWORD;
-    }
-
-    pub struct JoyPadState(XINPUT_STATE);
-
-    impl JoyPadState {
-        pub fn new() -> XINPUT_STATE {
-            XINPUT_STATE {
-                dwPacketNumber: 0,
-                Gamepad: XINPUT_GAMEPAD {
-                    wButtons: 0,//WORD,
-                    bLeftTrigger: 0,// BYTE,
-                    bRightTrigger: 0,//BYTE,
-                    sThumbLX: 0,//SHORT,
-                    sThumbLY: 0,//SHORT,
-                    sThumbRX: 0,//SHORT,
-                    sThumbRY: 0,//SHORT,
-                }
-            }
-        }
-    }
-}
 

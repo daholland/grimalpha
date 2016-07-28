@@ -4,6 +4,8 @@
 #[macro_use] mod app;
 mod steamworks;
 mod util;
+mod ui;
+mod input;
 use app::*;
 
 #[derive(Copy, Clone)]
@@ -17,8 +19,10 @@ implement_vertex!(Vertex, pos);
 
 fn main() {
     util::test();
+    util::testoml();
     let mut padstate = input::JoyPadState::new();
     let mut app = App::init();
+
 
     'outer: loop {
 
@@ -36,12 +40,12 @@ fn main() {
                 };
 
                 if let Event::MouseMoved(x, y) = ev {
-                    app.mouse_pos = (x, y)
+                    app.input_state.mouse.pos = (x, y)
                 };
 
 
                 if let Event::MouseInput(state, MouseButton::Left) = ev {
-                    app.mouse_pressed.0 = state == ElementState::Pressed
+                    app.input_state.mouse.buttons.0 = state == ElementState::Pressed
                 }
             
             }
