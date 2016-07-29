@@ -2,6 +2,7 @@
 #[macro_use] extern crate glium;
 
 #[macro_use] mod app;
+
 mod steamworks;
 mod util;
 mod ui;
@@ -20,16 +21,21 @@ implement_vertex!(Vertex, pos);
 fn main() {
     util::test();
     util::testoml();
-    let mut padstate = input::JoyPadState::new();
+
+    //#[cfg(feature = "xinput")]
+    //let mut padstate = input::xinput::JoyPadState::new();
+
     let mut app = App::init();
 
 
     'outer: loop {
-
-        unsafe {
-            let result = input::XInputGetState(0, &mut padstate);
+        //#[cfg(feature = "xinput")]
+        //unsafe {
+        //    let result = input::XInputGetState(0, &mut padstate);
             //println!("result: {:?}, padstate: {:?}", result, padstate);
-        }
+        //}
+        
+
 
         for ev in app.display.poll_events() {
             {
@@ -56,7 +62,8 @@ fn main() {
     }
 
     println!("steamapi inited: {:?}", app.steam_api);
-    unsafe {
-        steamworks::SteamAPI_Shutdown();
-    }
+
+    //unsafe {
+    //    steamworks::SteamAPI_Shutdown();
+    //}
 }

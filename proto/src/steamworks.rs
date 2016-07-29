@@ -1,13 +1,17 @@
+
 #[derive(Debug)]
 pub struct SteamAPI {
     pub loaded: bool,
 }
 
-#[link(name = "steam_api64", kind = "static")]
-extern "C" {
-    pub fn SteamAPI_Init() -> bool;
-    pub fn SteamAPI_Shutdown();
-    
+#[cfg(feature = "steamworks")]
+mod ffi {
+    #[link(name = "steam_api64", kind = "static")]
+    extern "C" {
+        pub fn SteamAPI_Init() -> bool;
+        pub fn SteamAPI_Shutdown();
+        
+    }
 }
 // #[link(name = "steamworks_sys")]
 // extern "C" {

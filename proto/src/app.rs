@@ -9,7 +9,9 @@ use imgui::glium_renderer::Renderer;
 
 use self::time::SteadyTime;
 
-use steamworks::{SteamAPI, SteamAPI_Init};
+
+use steamworks::{SteamAPI};
+
 use ::ui as ui;
 use ::input as input;
 

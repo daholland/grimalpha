@@ -26,7 +26,6 @@ pub fn hello_world(ui: &Ui, uistate: &mut UiState) {
             ui.plot_lines(im_str!("plot lines"), &[0.0f32, 0.5, 1.0, 1.5, 2.0]).build();
 
             
-            ui.invis_button(im_str!("canvas"), &mut [100.0, 100.0]).build();
         });
 }
 
