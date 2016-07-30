@@ -17,6 +17,10 @@ time = "*"
 winapi = {version = "*", optional = true}
 xinput-sys = {version = "*", optional = true}
 toml = "*"
+rustc-serialize = "*"
+uuid = { version = "0.2", features = ["rustc-serialize", "use_std", "v5"]}
+png = "*"
+image = "*"
 [dev-dependencies]
 gcc = "0.3"
 

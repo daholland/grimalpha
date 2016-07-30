@@ -1,0 +1,9 @@
+[app_config]
+root_path = "test"
+user_home_dir = "$HOME"
+resource_path = "assets/"
+game_config = "game/Game.toml"
+
+[video_config]
+resolution = {x=960, y=540}
+               

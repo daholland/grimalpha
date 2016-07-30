@@ -14,6 +14,8 @@ use steamworks::{SteamAPI};
 
 use ::ui as ui;
 use ::input as input;
+use ::util::config as config;
+use ::resource as resource;
 
 pub struct App {
     last_frame: SteadyTime,
@@ -25,65 +27,52 @@ pub struct App {
     pub steam_api: Option<SteamAPI>,
     log: (),
     event_sys: (),
-    resource_sys: (),
+    pub resource_sys: resource::ResourceManager,
     pub game: Game,
     pub input_state: input::InputState,
 }
 
-use std::path::Path;
+use std::path::PathBuf;
 
-struct AppConfig<'ac> {
-    root_path: Option<&'ac str>,
-    user_home_dir: Option<&'ac str>,
-    resource_path: Option<&'ac str>,
-    game_config: Option<&'ac str>
-}
 
-impl<'ac> AppConfig<'ac> {
+// struct AppBuilder {
+//     pub config: config::AppConfig,
+// }
+
+// impl AppBuilder {
+//     pub fn new(config_path: PathBuf) -> Self {
+//         println!("Path found! {}", config_path.to_str().unwrap());
+//         AppBuilder {
+//             config: config::AppConfig {
+//                 root_path: config_path,
+//                 user_home_dir: PathBuf::from(""),
+//                 resource_path: PathBuf::from(""),
+//                 game_config: PathBuf::from("").
+//             }
+            
+//         }
+        
+//     }
+// }
     
-}
-
-struct AppBuilder<'app> {
-    pub config: AppConfig<'app>,
-
-}
-
-impl<'app> AppBuilder<'app> {
-    pub fn new(config_path: Option<&'app str>) -> Self {
-        match config_path {
-            Some(path) => {
-                println!("Path found! {}", path);
-                AppBuilder {
-                    config: AppConfig {
-                        root_path: Some(path),
-                        user_home_dir: None,
-                        resource_path: None,
-                        game_config: None
-                    }
-                }
-            },
-            None => {
-                println!("No Path given!");
-                panic!();
-            }
-        }
-    }
 
     
-}
+
 
 pub struct Game {
 state: f32
 }
 
 impl App {
-    pub fn init() -> App {
+    pub fn init(cfg: config::Config) -> App {
         use glium::*;
 
+        let (win_res_x, win_res_y) = cfg.video_config.get_resolution();
+        println!("x: {:?}, y: {:?}", win_res_x as u32, win_res_y as u32);
         let display = glutin::WindowBuilder::new()
-            .with_dimensions(960,540)
-            .build_glium().
-            unwrap();
+            .with_dimensions(win_res_x as u32, win_res_y as u32)
+            .build_glium()
+            .unwrap();
 
         
         let mut imgui = ImGui::init();
@@ -91,26 +80,37 @@ impl App {
 
         imgui.set_imgui_key(ImGuiKey::A, 0);
 
+        let mut resource_sys = resource::ResourceManager {
+            textures: resource::TextureCache::new(),
+        };
+
+        let mut path = PathBuf::from(::util::get_curr_dir().unwrap());
+        path.push("man.png");
+
+        let man_texId = resource_sys.textures.load_image(path).unwrap();
 
         let vert_shader_src = r#"
 #version 140
 in vec2 pos;
-out vec2 my_attr;
+in vec2 tex_coords;
+out vec2 v_tex_coords;
 
 uniform mat4 matrix;
 
 void main() {
-  my_attr = pos;
+  v_tex_coords = tex_coords;
   gl_Position = matrix * vec4(pos, 0.0, 1.0);
 }
 "#;
         let frag_shader_src = r#"
 #version 140
-in vec2 my_attr;
+in vec2 v_tex_coords;
 out vec4 color;
 
+uniform sampler2D tex;
+
 void main() {
-  color = vec4(my_attr, 0.0, 1.0);
+  color = texture(tex, v_tex_coords);
 }
 "#;
 
@@ -129,7 +129,7 @@ void main() {
             steam_api: None,
             log: (),
             event_sys: (),
-            resource_sys: (),
+            resource_sys: resource_sys,
             game: Game {
                 state: -0.5
             },
@@ -163,13 +163,19 @@ void main() {
             self.game.state = -0.5
         }
 
+        let image_id = self.resource_sys.textures.get_keys().pop().unwrap();
+        let image = self.resource_sys.textures.get(&image_id).unwrap();
+        let image_dimensions = image.dimensions();
+        let image = image.into_glium_tex();
+        let texture = texture::Texture2d::new(&self.display, image).unwrap();
+        
         //begin draw
         let mut target = self.display.draw();
         target.clear_color(clear_color.0, clear_color.1, clear_color.2, clear_color.3);
 
-        let vert1 = ::Vertex { pos: [-0.5, -0.5]};
-        let vert2 = ::Vertex { pos: [0.0, 0.5]};
-        let vert3 = ::Vertex { pos: [0.5, -0.25]};
+        let vert1 = ::Vertex { pos: [-0.5, -0.5], tex_coords: [0.0, 0.0]};
+        let vert2 = ::Vertex { pos: [0.0, 0.5], tex_coords: [0.0, 1.0]};
+        let vert3 = ::Vertex { pos: [0.5, -0.25], tex_coords: [1.0, 0.0]};
         let shape = vec![vert1, vert2, vert3];
 
         let vert_buffer = glium::VertexBuffer::new(&self.display, &shape).unwrap();
@@ -182,7 +188,8 @@ void main() {
                 [-t.sin(), t.cos(), 0.0, 0.0],
                 [0.0, 0.0, 1.0, 0.0],
                 [t, 0.0, 0.0, 1.0f32],
-            ]  
+            ],
+            tex: &texture
         };
         target.draw(&vert_buffer, &indices, &self.shader, &uniforms, &Default::default()).unwrap();
 

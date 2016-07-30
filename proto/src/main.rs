@@ -3,31 +3,38 @@
 
 #[macro_use] mod app;
 
+extern crate png;
+extern crate image;
+extern crate rustc_serialize;
+extern crate uuid;
+
 mod steamworks;
 mod util;
 mod ui;
 mod input;
+mod resource;
 use app::*;
+use std::path::PathBuf;
 
 #[derive(Copy, Clone)]
 pub struct Vertex {
     pos: [f32; 2],
+    tex_coords: [f32; 2]
 }
 
-implement_vertex!(Vertex, pos);
+implement_vertex!(Vertex, pos, tex_coords);
 
 
 
 fn main() {
-    util::test();
-    util::testoml();
+    let config = util::read_config().unwrap();
 
     //#[cfg(feature = "xinput")]
     //let mut padstate = input::xinput::JoyPadState::new();
 
-    let mut app = App::init();
+    let mut app = App::init(config);
 
-
+    
     'outer: loop {
         //#[cfg(feature = "xinput")]
         //unsafe {
@@ -53,6 +60,8 @@ fn main() {
                 if let Event::MouseInput(state, MouseButton::Left) = ev {
                     app.input_state.mouse.buttons.0 = state == ElementState::Pressed
                 }
+
+                //println!("mouse (x,y): {:?}", app.input_state.mouse.pos);
             
             }
         }
