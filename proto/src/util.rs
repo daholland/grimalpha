@@ -62,11 +62,6 @@ pub fn read_config() -> Result<config::Config, Error> {
         app_config: ac,
         video_config: vc
     })
-    
-
-    
-
-
 }
 
 pub mod config {

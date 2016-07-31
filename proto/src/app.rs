@@ -6,7 +6,6 @@ extern crate imgui_sys;
 use glium::backend::glutin_backend::GlutinFacade;
 use imgui::{ImGui, ImGuiKey, Ui};
 use imgui::glium_renderer::Renderer;
-
 use self::time::SteadyTime;
 
 
@@ -87,10 +86,20 @@ impl App {
         let mut path = PathBuf::from(::util::get_curr_dir().unwrap());
         path.push("man.png");
 
-        let man_texId = resource_sys.textures.load_image(path).unwrap();
+        let mut texture = resource::Texture::new(&display, "man", path, (64,128));
+        let tex_id = resource::make_resource_id(resource::ResourceNs::Texture, "man");
+
+        texture.load(&display).unwrap();
+
+        resource_sys.textures.add(tex_id, texture);
+
+
+        //TODO: load from resource manager and change vis for Texture::load
+
 
         let vert_shader_src = r#"
-#version 140
+#version 150
+
 in vec2 pos;
 in vec2 tex_coords;
 out vec2 v_tex_coords;
@@ -103,7 +112,7 @@ void main() {
 }
 "#;
         let frag_shader_src = r#"
-#version 140
+#version 150
 in vec2 v_tex_coords;
 out vec4 color;
 
@@ -152,23 +161,14 @@ void main() {
     pub fn render<F: FnMut(&Ui, &mut ui::UiState)>(&mut self, clear_color: (f32,f32,f32,f32), mut run_ui: F)
         where F:FnMut(&Ui, &mut ui::UiState) {
         use glium::*;
+
         let now = SteadyTime::now();
         let delta = now - self.last_frame;
         let delta_f = delta.num_nanoseconds().unwrap() as f32/ 1_000_000_000.0;
         self.last_frame = now;
         self.update_mouse();
 
-        self.game.state += 0.0002;
-        if self.game.state > 0.5 {
-            self.game.state = -0.5
-        }
-
-        let image_id = self.resource_sys.textures.get_keys().pop().unwrap();
-        let image = self.resource_sys.textures.get(&image_id).unwrap();
-        let image_dimensions = image.dimensions();
-        let image = image.into_glium_tex();
-        let texture = texture::Texture2d::new(&self.display, image).unwrap();
-        
+        let texture = self.resource_sys.get_raw_texture("man").unwrap();
         //begin draw
         let mut target = self.display.draw();
         target.clear_color(clear_color.0, clear_color.1, clear_color.2, clear_color.3);
@@ -180,16 +180,17 @@ void main() {
 
         let vert_buffer = glium::VertexBuffer::new(&self.display, &shape).unwrap();
         let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
+        let mut t = -0.5;
+        
 
-        let t = self.game.state;
         let uniforms = uniform! {
             matrix: [
-                [t.cos(), t.sin(), 0.0, 0.0],
-                [-t.sin(), t.cos(), 0.0, 0.0],
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
                 [0.0, 0.0, 1.0, 0.0],
                 [t, 0.0, 0.0, 1.0f32],
             ],
-            tex: &texture
+            tex: texture,
         };
         target.draw(&vert_buffer, &indices, &self.shader, &uniforms, &Default::default()).unwrap();
 

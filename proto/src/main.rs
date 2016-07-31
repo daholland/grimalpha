@@ -7,6 +7,7 @@ extern crate png;
 extern crate image;
 extern crate rustc_serialize;
 extern crate uuid;
+extern crate cgmath;
 
 mod steamworks;
 mod util;
