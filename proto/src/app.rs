@@ -1,6 +1,7 @@
 extern crate glium;
 extern crate time;
 extern crate imgui_sys;
+extern crate nalgebra;
 
 // TODO: split out into own mod for Support/Systems holder
 use glium::backend::glutin_backend::GlutinFacade;
@@ -9,12 +10,12 @@ use imgui::glium_renderer::Renderer;
 use self::time::SteadyTime;
 
 
-use steamworks::{SteamAPI};
+use steamworks::SteamAPI;
 
-use ::ui as ui;
-use ::input as input;
-use ::util::config as config;
-use ::resource as resource;
+use ::ui;
+use ::input;
+use ::util::config;
+use ::resource;
 
 pub struct App {
     last_frame: SteadyTime,
@@ -48,24 +49,24 @@ use std::path::PathBuf;
 //                 resource_path: PathBuf::from(""),
 //                 game_config: PathBuf::from("").
 //             }
-            
+
 //         }
-        
+
 //     }
 // }
-    
 
-    
+
+
 
 
 pub struct Game {
-state: f32
+    state: f32,
 }
 
 impl App {
     pub fn init(cfg: config::Config) -> App {
         use glium::*;
-
+        use resource::Resource;
         let (win_res_x, win_res_y) = cfg.video_config.get_resolution();
         println!("x: {:?}, y: {:?}", win_res_x as u32, win_res_y as u32);
         let display = glutin::WindowBuilder::new()
@@ -73,64 +74,76 @@ impl App {
             .build_glium()
             .unwrap();
 
-        
+
         let mut imgui = ImGui::init();
         let renderer = Renderer::init(&mut imgui, &display).unwrap();
 
         imgui.set_imgui_key(ImGuiKey::A, 0);
 
-        let mut resource_sys = resource::ResourceManager {
-            textures: resource::TextureCache::new(),
-        };
+        let mut resource_sys =
+            resource::ResourceManager { textures: resource::TextureCache::new() };
 
         let mut path = PathBuf::from(::util::get_curr_dir().unwrap());
         path.push("man.png");
 
-        let mut texture = resource::Texture::new(&display, "man", path, (64,128));
+        let mut texture = resource::Texture::new(&display, "man", path, (64, 128));
         let tex_id = resource::make_resource_id(resource::ResourceNs::Texture, "man");
 
         texture.load(&display).unwrap();
 
-        resource_sys.textures.add(tex_id, texture);
+        println!("man size: {:?}\ndims: {:?}\nusize size: {:?}",
+                 texture.size(),
+                 texture.dimensions(),
+                 ::std::mem::size_of::<usize>());
+        let _ = resource_sys.textures.add(tex_id, texture);
+        
 
-
-        //TODO: load from resource manager and change vis for Texture::load
+        // TODO: load from resource manager and change vis for Texture::load
 
 
         let vert_shader_src = r#"
-#version 150
+#version 330 core
 
-in vec2 pos;
+in vec3 position;
 in vec2 tex_coords;
 out vec2 v_tex_coords;
 
 uniform mat4 matrix;
 
 void main() {
-  v_tex_coords = tex_coords;
-  gl_Position = matrix * vec4(pos, 0.0, 1.0);
+
+v_tex_coords = tex_coords;
+
+gl_Position = matrix * vec4(position, 1.0);
+
 }
 "#;
         let frag_shader_src = r#"
-#version 150
+#version 330 core
+
 in vec2 v_tex_coords;
 out vec4 color;
 
 uniform sampler2D tex;
 
+
 void main() {
   color = texture(tex, v_tex_coords);
+
+
+
 }
 "#;
 
-            let program = glium::Program::from_source(&display, vert_shader_src, frag_shader_src,None).unwrap();
+        let program = glium::Program::from_source(&display, vert_shader_src, frag_shader_src, None)
+            .unwrap();
 
         App {
             display: display.clone(),
             ui_sys: imgui,
             ui_state: ui::UiState {
-                colorpick: [0.0,0.0,0.0,0.0],
-                show_color_window: true
+                colorpick: [0.0, 0.0, 0.0, 0.0],
+                show_color_window: true,
             },
             renderer: renderer,
             last_frame: SteadyTime::now(),
@@ -139,79 +152,117 @@ void main() {
             log: (),
             event_sys: (),
             resource_sys: resource_sys,
-            game: Game {
-                state: -0.5
-            },
+            game: Game { state: -0.5 },
             input_state: input::InputState {
                 mouse: input::MouseState {
-                    pos: (0,0),
+                    pos: (0, 0),
                     buttons: (false, false, false),
-                }
-            }
+                },
+            },
         }
     }
     pub fn update_mouse(&mut self) {
         let scale = self.ui_sys.display_framebuffer_scale();
         self.ui_sys.set_mouse_pos(self.input_state.mouse.pos.0 as f32 / scale.0,
-                                  self.input_state.mouse.pos.1 as f32 / scale.1 );
+                                  self.input_state.mouse.pos.1 as f32 / scale.1);
         self.ui_sys.set_mouse_down(&[self.input_state.mouse.buttons.0,
-                                     self.input_state.mouse.buttons.1, self.input_state.mouse.buttons.2, false, false]);
+                                     self.input_state.mouse.buttons.1,
+                                     self.input_state.mouse.buttons.2,
+                                     false,
+                                     false]);
     }
 
-    pub fn render<F: FnMut(&Ui, &mut ui::UiState)>(&mut self, clear_color: (f32,f32,f32,f32), mut run_ui: F)
-        where F:FnMut(&Ui, &mut ui::UiState) {
+    pub fn render<F: FnMut(&Ui, &mut ui::UiState)>(&mut self,
+                                                   clear_color: (f32, f32, f32, f32),
+                                                   mut run_ui: F)
+        where F: FnMut(&Ui, &mut ui::UiState)
+    {
+        use nalgebra::*;
         use glium::*;
+        use glium::uniforms::*;
 
         let now = SteadyTime::now();
         let delta = now - self.last_frame;
-        let delta_f = delta.num_nanoseconds().unwrap() as f32/ 1_000_000_000.0;
+        let delta_f = delta.num_nanoseconds().unwrap() as f32 / 1_000_000_000.0;
         self.last_frame = now;
         self.update_mouse();
 
-        let texture = self.resource_sys.get_raw_texture("man").unwrap();
-        //begin draw
+
+       
+        ////////////////
+        // DRAW
+        ////////////////
+ 
         let mut target = self.display.draw();
-        target.clear_color(clear_color.0, clear_color.1, clear_color.2, clear_color.3);
 
-        let vert1 = ::Vertex { pos: [-0.5, -0.5], tex_coords: [0.0, 0.0]};
-        let vert2 = ::Vertex { pos: [0.0, 0.5], tex_coords: [0.0, 1.0]};
-        let vert3 = ::Vertex { pos: [0.5, -0.25], tex_coords: [1.0, 0.0]};
-        let shape = vec![vert1, vert2, vert3];
-
-        let vert_buffer = glium::VertexBuffer::new(&self.display, &shape).unwrap();
-        let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
-        let mut t = -0.5;
+        target.clear_color_and_depth(clear_color, 1.0);
         
+        let shape = glium::vertex::VertexBuffer::new(&self.display, &[
+            ::Vertex { position: [0.0,  1.0, 0.0], tex_coords: [0.0, 1.0] },
+            ::Vertex { position: [ 1.0,  0.0, 0.0], tex_coords: [1.0, 0.0] },
+            ::Vertex { position: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0] },
+
+            ::Vertex { position: [0.0,  1.0, 0.0], tex_coords: [0.0, 1.0] },
+            ::Vertex { position: [1.0,  1.0, 0.0], tex_coords: [1.0, 1.0] },
+            ::Vertex { position: [1.0, 0.0, 0.0], tex_coords: [1.0, 0.0] },
+        ]).unwrap();
+
+        let shape_idx = vec![0u16, 1, 2, 0, 3, 1];
+        let indices = glium::index::IndexBuffer::new(&self.display, glium::index::PrimitiveType::TrianglesList, &shape_idx).unwrap();
+
+        let texture = self.resource_sys.get_raw_texture("man").unwrap();
+
+        let size = Vector2::new(64.0, 128.0);
+
+        let model = [
+            [1.0, 0.0  , 0.0 ,0.0],
+            [0.0 , 1.0, 0.0 ,0.0],
+            [0.0 , 0.0  , 1.0 ,0.0],
+            [0.0 , 0.0  , 0.0 ,1.0f32]
+];
+
+
+        let params = glium::DrawParameters {
+                        .. Default::default()
+        };
+
+
+        // let m = [
+        //     [m.m11 , m.m12, m.m13, m.m14],
+        //     [m.m21, m.m22, m.m23, m.m42],
+        //     [m.m31, m.m32, m.m33, m.m43],
+        //     [m.m41, m.m42, m.m43, m.m44]
+        // ];
 
         let uniforms = uniform! {
-            matrix: [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [t, 0.0, 0.0, 1.0f32],
-            ],
-            tex: texture,
+            matrix: model,
+            tex: texture
         };
-        target.draw(&vert_buffer, &indices, &self.shader, &uniforms, &Default::default()).unwrap();
 
+        target.draw(&shape,
+                    &indices,
+                  &self.shader,
+                  &uniforms,
+                  &params)
+            .unwrap();
 
-        // ui render
+        ////////////////
+        // UI
+        ////////////////
+
         let window = self.display.get_window().unwrap();
 
         let size_pts = window.get_inner_size_points().unwrap();
         let size_px = window.get_inner_size_pixels().unwrap();
 
         let ui = self.ui_sys.frame(size_pts, size_px, delta_f);
-        
+
         run_ui(&ui, &mut self.ui_state);
 
         self.renderer.render(&mut target, ui).unwrap();
-        //finish draw call
+        // finish draw call
 
         target.finish().unwrap();
-        
+
     }
 }
-
-
-

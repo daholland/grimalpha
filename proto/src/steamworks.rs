@@ -10,7 +10,7 @@ mod ffi {
     extern "C" {
         pub fn SteamAPI_Init() -> bool;
         pub fn SteamAPI_Shutdown();
-        
+
     }
 }
 // #[link(name = "steamworks_sys")]
