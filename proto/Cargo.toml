@@ -21,7 +21,7 @@ rustc-serialize = "*"
 uuid = { version = "0.2", features = ["rustc-serialize", "use_std", "v5"]}
 png = "*"
 image = "*"
-nalgebra = "*"
+cgmath = "*"
 [dev-dependencies]
 gcc = "0.3"
 

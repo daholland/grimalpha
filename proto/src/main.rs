@@ -11,7 +11,7 @@ extern crate png;
 extern crate image;
 extern crate rustc_serialize;
 extern crate uuid;
-extern crate nalgebra;
+extern crate cgmath;
 
 mod steamworks;
 mod util;
@@ -21,13 +21,14 @@ mod resource;
 use app::*;
 use std::path::PathBuf;
 
+
 #[derive(Copy, Clone)]
-pub struct Vertex {
+pub struct SpriteVertex {
     position: [f32; 3],
     tex_coords: [f32; 2],
 }
 
-implement_vertex!(Vertex, position, tex_coords);
+implement_vertex!(SpriteVertex, position, tex_coords);
 
 
 

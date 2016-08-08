@@ -1,7 +1,7 @@
 extern crate glium;
 extern crate time;
 extern crate imgui_sys;
-extern crate nalgebra;
+extern crate cgmath;
 
 // TODO: split out into own mod for Support/Systems holder
 use glium::backend::glutin_backend::GlutinFacade;
@@ -81,28 +81,49 @@ impl App {
         imgui.set_imgui_key(ImGuiKey::A, 0);
 
         let mut resource_sys =
-            resource::ResourceManager { textures: resource::TextureCache::new() };
+            resource::ResourceManager { textures: resource::texture::TextureCache::new() };
 
-        let mut path = PathBuf::from(::util::get_curr_dir().unwrap());
-        path.push("man.png");
+        {
+            let mut path = PathBuf::from(::util::get_curr_dir().unwrap());
+            path.push("man.png");
 
-        let mut texture = resource::Texture::new(&display, "man", path, (64, 128));
-        let tex_id = resource::make_resource_id(resource::ResourceNs::Texture, "man");
+            let mut texture = resource::texture::Texture::new(&display, "man", path, (64, 128));
+            let tex_id = resource::make_resource_id(resource::ResourceNs::Texture, "man");
 
-        texture.load(&display).unwrap();
+            texture.load(&display).unwrap();
 
-        println!("man size: {:?}\ndims: {:?}\nusize size: {:?}",
-                 texture.size(),
-                 texture.dimensions(),
-                 ::std::mem::size_of::<usize>());
-        let _ = resource_sys.textures.add(tex_id, texture);
-        
+            
+
+
+            println!("man size: {:?}\ndims: {:?}\nusize size: {:?}",
+                     texture.size(),
+                     texture.dimensions(),
+                     ::std::mem::size_of::<usize>());
+            let _ = resource_sys.textures.add(tex_id, texture);
+        }
+
+        {
+            let mut path = PathBuf::from(::util::get_curr_dir().unwrap());
+            path.push("4x4.png");
+
+            let mut texture = resource::texture::Texture::new(&display, "4x4", path, (128, 128));
+            let tex_id = resource::make_resource_id(resource::ResourceNs::Texture, "4x4");
+
+            texture.load(&display).unwrap();
+
+            println!("man size: {:?}\ndims: {:?}\nusize size: {:?}",
+                     texture.size(),
+                     texture.dimensions(),
+                     ::std::mem::size_of::<usize>());
+
+            let _ = resource_sys.textures.add(tex_id, texture);
+        } 
 
         // TODO: load from resource manager and change vis for Texture::load
 
 
         let vert_shader_src = r#"
-#version 330 core
+#version 150
 
 in vec3 position;
 in vec2 tex_coords;
@@ -119,7 +140,7 @@ gl_Position = matrix * vec4(position, 1.0);
 }
 "#;
         let frag_shader_src = r#"
-#version 330 core
+#version 150
 
 in vec2 v_tex_coords;
 out vec4 color;
@@ -177,9 +198,10 @@ void main() {
                                                    mut run_ui: F)
         where F: FnMut(&Ui, &mut ui::UiState)
     {
-        use nalgebra::*;
+        use cgmath::prelude::*;
         use glium::*;
         use glium::uniforms::*;
+
 
         let now = SteadyTime::now();
         let delta = now - self.last_frame;
@@ -194,53 +216,52 @@ void main() {
         ////////////////
  
         let mut target = self.display.draw();
-
+        let (vp_x, vp_y) = target.get_dimensions();
+        println!("Viewport: {:?}, {:?}", vp_x, vp_y);
         target.clear_color_and_depth(clear_color, 1.0);
         
         let shape = glium::vertex::VertexBuffer::new(&self.display, &[
-            ::Vertex { position: [0.0,  1.0, 0.0], tex_coords: [0.0, 1.0] },
-            ::Vertex { position: [ 1.0,  0.0, 0.0], tex_coords: [1.0, 0.0] },
-            ::Vertex { position: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0] },
+            ::SpriteVertex { position: [0.0,  0.0, 0.0], tex_coords: [0.0, 0.0] },
+            ::SpriteVertex { position: [1.0,  0.0, 0.0], tex_coords: [1.0, 0.0] },
+            ::SpriteVertex { position: [0.0, 1.0, 0.0], tex_coords: [0.0, 1.0] },
+            ::SpriteVertex { position: [1.0,  1.0, 0.0], tex_coords: [1.0, 1.0] },
 
-            ::Vertex { position: [0.0,  1.0, 0.0], tex_coords: [0.0, 1.0] },
-            ::Vertex { position: [1.0,  1.0, 0.0], tex_coords: [1.0, 1.0] },
-            ::Vertex { position: [1.0, 0.0, 0.0], tex_coords: [1.0, 0.0] },
         ]).unwrap();
 
-        let shape_idx = vec![0u16, 1, 2, 0, 3, 1];
-        let indices = glium::index::IndexBuffer::new(&self.display, glium::index::PrimitiveType::TrianglesList, &shape_idx).unwrap();
-
         let texture = self.resource_sys.get_raw_texture("man").unwrap();
+        let landtexture = self.resource_sys.get_raw_texture("4x4").unwrap();
+        let (tex_x, tex_y) = (landtexture.get_width(), texture.get_height().unwrap());
+        let landtexture = landtexture;
+        println!("Tex_w, tex_h: {:?}, {:?}", tex_x, tex_y);
 
-        let size = Vector2::new(64.0, 128.0);
+        let translate = cgmath::Matrix4::from_translation((-1.0, -1.0, 0.0f32).into());
+        let scale = cgmath::Matrix4::from_nonuniform_scale(1.0f32/(vp_x as f32/tex_x as f32), 1.0f32/(vp_y as f32/tex_y as f32), 1.0f32);
 
-        let model = [
-            [1.0, 0.0  , 0.0 ,0.0],
-            [0.0 , 1.0, 0.0 ,0.0],
-            [0.0 , 0.0  , 1.0 ,0.0],
-            [0.0 , 0.0  , 0.0 ,1.0f32]
-];
+        let world2view = cgmath::Matrix4::look_at((0.0, 0.0, 1.0f32).into(),
+                                      (0.0, 0.0, 0.0f32).into(),
+                                      [0.0, 1.0, 0.0f32].into());
+        
 
+        let model2world = translate.concat(&scale);
+
+        let view2projection = cgmath::ortho::<f32>(0.0, 960.0, 0.0, 540.0, -1.0, 1.0f32);
+
+        let combined = world2view.concat(&model2world);
+
+        let combined: [[f32; 4]; 4] = combined.into();
 
         let params = glium::DrawParameters {
+            // polygon_mode: PolygonMode::Line,
+            dithering: true,
                         .. Default::default()
         };
-
-
-        // let m = [
-        //     [m.m11 , m.m12, m.m13, m.m14],
-        //     [m.m21, m.m22, m.m23, m.m42],
-        //     [m.m31, m.m32, m.m33, m.m43],
-        //     [m.m41, m.m42, m.m43, m.m44]
-        // ];
-
         let uniforms = uniform! {
-            matrix: model,
-            tex: texture
+            // matrix: [[1.0,0.0,0.0,0.0], [0.0,1.0,0.0,0.0], [0.0,0.0,1.0,0.0], [0.0,0.0,0.0,1.0f32],],
+            matrix: combined,
+            tex: landtexture
         };
-
         target.draw(&shape,
-                    &indices,
+                    glium::index::NoIndices(glium::index::PrimitiveType::TriangleStrip),
                   &self.shader,
                   &uniforms,
                   &params)
