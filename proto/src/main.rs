@@ -72,7 +72,7 @@ fn main() {
             }
         }
 
-        app.render((1.0, 1.0, 1.0, 1.0), ui::hello_world);
+        app.render((0.2, 0.2, 0.2, 1.0), ui::hello_world);
 
     }
 

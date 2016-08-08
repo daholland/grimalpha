@@ -14,7 +14,7 @@ use ::uuid::Uuid;
 use ::image;
 
 use glium::backend::glutin_backend::GlutinFacade;
-use glium::texture::{Texture2d, RawImage2d, PixelValue};
+use glium::texture::{SrgbTexture2d, RawImage2d, PixelValue};
 
 use std::fmt;
 
@@ -115,7 +115,7 @@ impl ResourceManager {
         ResourceManager { textures: texture::TextureCache::new() }
     }
 
-    pub fn get_raw_texture(&self, name: &str) -> ResourceResult<&Texture2d> {
+    pub fn get_raw_texture(&self, name: &str) -> ResourceResult<&SrgbTexture2d> {
         let tid = make_resource_id(ResourceNs::Texture, name);
 
         self.textures.get(&tid).map(|t| t.raw())

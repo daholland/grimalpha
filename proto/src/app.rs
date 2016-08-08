@@ -69,6 +69,7 @@ impl App {
         use resource::Resource;
         let (win_res_x, win_res_y) = cfg.video_config.get_resolution();
         println!("x: {:?}, y: {:?}", win_res_x as u32, win_res_y as u32);
+
         let display = glutin::WindowBuilder::new()
             .with_dimensions(win_res_x as u32, win_res_y as u32)
             .build_glium()
@@ -82,9 +83,12 @@ impl App {
 
         let mut resource_sys =
             resource::ResourceManager { textures: resource::texture::TextureCache::new() };
-
+// TODO: use config file for asset base directories
         {
+            
             let mut path = PathBuf::from(::util::get_curr_dir().unwrap());
+            path.push("assets");
+            path.push("textures");
             path.push("man.png");
 
             let mut texture = resource::texture::Texture::new(&display, "man", path, (64, 128));
@@ -104,6 +108,8 @@ impl App {
 
         {
             let mut path = PathBuf::from(::util::get_curr_dir().unwrap());
+            path.push("assets");
+            path.push("textures");
             path.push("4x4.png");
 
             let mut texture = resource::texture::Texture::new(&display, "4x4", path, (128, 128));
@@ -119,37 +125,36 @@ impl App {
             let _ = resource_sys.textures.add(tex_id, texture);
         } 
 
-        // TODO: load from resource manager and change vis for Texture::load
-
 
         let vert_shader_src = r#"
-#version 150
+#version 330 core
 
 in vec3 position;
 in vec2 tex_coords;
 out vec2 v_tex_coords;
 
-uniform mat4 matrix;
+uniform mat4 modelview;
+uniform mat4 projection;
 
 void main() {
 
 v_tex_coords = tex_coords;
 
-gl_Position = matrix * vec4(position, 1.0);
+gl_Position = projection * modelview * vec4(position, 1.0);
 
 }
 "#;
         let frag_shader_src = r#"
-#version 150
-
+#version 330 core
 in vec2 v_tex_coords;
+
 out vec4 color;
 
 uniform sampler2D tex;
 
 
 void main() {
-  color = texture(tex, v_tex_coords);
+  color = texture2D(tex, v_tex_coords);
 
 
 
@@ -217,55 +222,96 @@ void main() {
  
         let mut target = self.display.draw();
         let (vp_x, vp_y) = target.get_dimensions();
-        println!("Viewport: {:?}, {:?}", vp_x, vp_y);
-        target.clear_color_and_depth(clear_color, 1.0);
+        // println!("Viewport: {:?}, {:?}", vp_x, vp_y);
+        target.clear_color(clear_color.0,clear_color.1, clear_color.2,clear_color.3);
         
-        let shape = glium::vertex::VertexBuffer::new(&self.display, &[
-            ::SpriteVertex { position: [0.0,  0.0, 0.0], tex_coords: [0.0, 0.0] },
-            ::SpriteVertex { position: [1.0,  0.0, 0.0], tex_coords: [1.0, 0.0] },
-            ::SpriteVertex { position: [0.0, 1.0, 0.0], tex_coords: [0.0, 1.0] },
-            ::SpriteVertex { position: [1.0,  1.0, 0.0], tex_coords: [1.0, 1.0] },
-
-        ]).unwrap();
-
-        let texture = self.resource_sys.get_raw_texture("man").unwrap();
-        let landtexture = self.resource_sys.get_raw_texture("4x4").unwrap();
-        let (tex_x, tex_y) = (landtexture.get_width(), texture.get_height().unwrap());
-        let landtexture = landtexture;
-        println!("Tex_w, tex_h: {:?}, {:?}", tex_x, tex_y);
-
-        let translate = cgmath::Matrix4::from_translation((-1.0, -1.0, 0.0f32).into());
-        let scale = cgmath::Matrix4::from_nonuniform_scale(1.0f32/(vp_x as f32/tex_x as f32), 1.0f32/(vp_y as f32/tex_y as f32), 1.0f32);
-
-        let world2view = cgmath::Matrix4::look_at((0.0, 0.0, 1.0f32).into(),
-                                      (0.0, 0.0, 0.0f32).into(),
-                                      [0.0, 1.0, 0.0f32].into());
         
-
-        let model2world = translate.concat(&scale);
-
-        let view2projection = cgmath::ortho::<f32>(0.0, 960.0, 0.0, 540.0, -1.0, 1.0f32);
-
-        let combined = world2view.concat(&model2world);
-
-        let combined: [[f32; 4]; 4] = combined.into();
-
+        let projection: [[f32; 4]; 4] = cgmath::ortho::<f32>(0.0, 960.0, 0.0, 540.0, 0.0, 100.0f32).into();
+        let view = cgmath::Matrix4::look_at((0.0, 0.0, 1.0f32).into(),
+                                                  (0.0, 0.0, -1.0f32).into(),
+                                                  [0.0, 1.0, 0.0f32].into());
         let params = glium::DrawParameters {
             // polygon_mode: PolygonMode::Line,
             dithering: true,
-                        .. Default::default()
+            blend: Blend::alpha_blending(),
+            backface_culling: BackfaceCullingMode::CullingDisabled,
+            viewport: Some(Rect{left: 0, bottom: 0, width: 960, height: 540}),
+            .. Default::default()
         };
-        let uniforms = uniform! {
-            // matrix: [[1.0,0.0,0.0,0.0], [0.0,1.0,0.0,0.0], [0.0,0.0,1.0,0.0], [0.0,0.0,0.0,1.0f32],],
-            matrix: combined,
-            tex: landtexture
-        };
-        target.draw(&shape,
-                    glium::index::NoIndices(glium::index::PrimitiveType::TriangleStrip),
-                  &self.shader,
-                  &uniforms,
-                  &params)
-            .unwrap();
+        {
+            let shape = glium::vertex::VertexBuffer::new(&self.display, &[
+                ::SpriteVertex { position: [0.0,  0.0, 0.0], tex_coords: [0.0, 0.0] },
+                ::SpriteVertex { position: [128.0, 0.0, 0.0], tex_coords: [1.0, 0.0] },
+                ::SpriteVertex { position: [0.0,  128.0, 0.0], tex_coords: [0.0, 1.0] },
+                ::SpriteVertex { position: [128.0,  128.0, 0.0], tex_coords: [1.0, 1.0] },
+
+            ]).unwrap();
+            
+            let landtexture = self.resource_sys.get_raw_texture("4x4").unwrap();
+            let (tex_x, tex_y) = (landtexture.get_width(), landtexture.get_height().unwrap());
+            let sampler = Sampler(landtexture, SamplerBehavior {
+                minify_filter: MinifySamplerFilter::Nearest,
+                magnify_filter: MagnifySamplerFilter::Nearest,
+                .. Default::default()
+            });
+
+            let translate = cgmath::Matrix4::from_translation((-1.0, -1.0, 0.0f32).into());
+            let scale = cgmath::Matrix4::from_nonuniform_scale(0.5, 0.5, 0.5f32);
+
+            let mut x = 0.0f32;
+            while x < 15.0 {
+                println!("x: {:?}", x);
+                let offset = cgmath::Matrix4::from_translation((((tex_x as f32)*(x as f32)), 0.0, 0.0f32).into());
+                let world = translate.concat(&scale).concat(&offset);
+                let combined: [[f32; 4]; 4] = (view * world).into();
+
+                let uniforms = uniform! {
+                    // matrix: [[1.0,0.0,0.0,0.0], [0.0,1.0,0.0,0.0], [0.0,0.0,1.0,0.0], [0.0,0.0,0.0,1.0f32],],
+                    modelview: combined,
+                    tex: sampler,
+                    projection: projection
+                };
+                target.draw(&shape,
+                            glium::index::NoIndices(glium::index::PrimitiveType::TriangleStrip),
+                            &self.shader,
+                            &uniforms,
+                            &params)
+                    .unwrap();
+                x += 1.0;
+            }
+        }
+//////////////////////
+        {
+            let shape = glium::vertex::VertexBuffer::new(&self.display, &[
+                ::SpriteVertex { position: [0.0,  0.0, 0.0], tex_coords: [0.0, 0.0] },
+                ::SpriteVertex { position: [64.0, 0.0, 0.0], tex_coords: [1.0, 0.0] },
+                ::SpriteVertex { position: [0.0,  128.0, 0.0], tex_coords: [0.0, 1.0] },
+                ::SpriteVertex { position: [64.0,  128.0, 0.0f32], tex_coords: [1.0, 1.0] },
+
+            ]).unwrap();
+            let mantexture = self.resource_sys.get_raw_texture("man").unwrap();
+            let (tex_x, tex_y) = (mantexture.get_width(), mantexture.get_height().unwrap());
+
+            let translate = cgmath::Matrix4::from_translation((-1.0, -1.0, 0.0f32).into());
+            let scale = cgmath::Matrix4::from_nonuniform_scale(0.5, 0.5, 0.5f32);
+
+            let localmantranslate = cgmath::Matrix4::from_translation([128.0, (tex_y as f32), 0.0].into());
+
+            let world = translate.concat(&scale).concat(&localmantranslate);
+            let combined: [[f32; 4]; 4] = (view * world).into();
+            
+            let manuniforms = uniform! {
+                modelview: combined,
+                tex: mantexture,
+                projection: projection
+            };
+            target.draw(&shape,
+                        glium::index::NoIndices(glium::index::PrimitiveType::TriangleStrip),
+                        &self.shader,
+                        &manuniforms,
+                        &params)
+                .unwrap();
+        }
 
         ////////////////
         // UI

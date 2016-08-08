@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::fmt;
 use std::fs::File;
 use glium::backend::glutin_backend::GlutinFacade;
-use glium::texture::{Texture2d, RawImage2d, PixelValue};
+use glium::texture::{SrgbTexture2d,Texture2d, RawImage2d, PixelValue};
 
 
 use ::util;
@@ -63,7 +63,7 @@ impl TextureCache {
 pub struct Texture {
     name: String,
     id: TextureId,
-    data: Texture2d,
+    data: SrgbTexture2d,
     size: usize,
     dimensions: (u32, u32),
     path: PathBuf,
@@ -111,12 +111,15 @@ impl Texture {
         let fin = File::open(self.path.clone()).unwrap();
         let fin = BufReader::new(fin);
 
-        let image = image::load(fin, image::ImageFormat::PNG).unwrap().to_rgba();
+        let image = image::load(fin, image::ImageFormat::PNG).unwrap();
+        println!("image: color: {:?}", image.color());
+
+        let image = image.to_rgba();
         let dimensions = image.dimensions();
         let image = RawImage2d::from_raw_rgba_reversed(image.into_raw(), dimensions);
 
 
-        self.data = Texture2d::new(display, image).unwrap();
+        self.data = SrgbTexture2d::new(display, image).unwrap();
 
         self.size = mem::size_of::<Self>();
 
@@ -125,7 +128,7 @@ impl Texture {
         Ok(tex_id)
     }
 
-    pub fn raw(&self) -> &Texture2d {
+    pub fn raw(&self) -> &SrgbTexture2d {
         &self.data
     }
 
@@ -138,7 +141,7 @@ impl Texture {
 
         let tex_id = super::make_resource_id(ResourceNs::Texture, name);
         let size = mem::size_of::<Texture>();
-        let image = ::glium::texture::Texture2d::empty(display, dimensions.0, dimensions.1)
+        let image = ::glium::texture::SrgbTexture2d::empty(display, dimensions.0, dimensions.1)
             .unwrap();
         Texture {
             name: name.to_owned(),
