@@ -259,7 +259,7 @@ void main() {
             let scale = cgmath::Matrix4::from_nonuniform_scale(0.5, 0.5, 0.5f32);
 
             let mut x = 0.0f32;
-            while x < 15.0 {
+            while x < 20.0 {
                 println!("x: {:?}", x);
                 let offset = cgmath::Matrix4::from_translation((((tex_x as f32)*(x as f32)), 0.0, 0.0f32).into());
                 let world = translate.concat(&scale).concat(&offset);
@@ -292,7 +292,7 @@ void main() {
             let mantexture = self.resource_sys.get_raw_texture("man").unwrap();
             let (tex_x, tex_y) = (mantexture.get_width(), mantexture.get_height().unwrap());
 
-            let translate = cgmath::Matrix4::from_translation((-1.0, -1.0, 0.0f32).into());
+            let translate = cgmath::Matrix4::from_translation((0.0, 0.0, 0.0f32).into());
             let scale = cgmath::Matrix4::from_nonuniform_scale(0.5, 0.5, 0.5f32);
 
             let localmantranslate = cgmath::Matrix4::from_translation([128.0, (tex_y as f32), 0.0].into());

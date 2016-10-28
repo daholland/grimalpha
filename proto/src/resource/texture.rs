@@ -12,7 +12,7 @@ use ::util;
 use ::uuid::Uuid;
 use ::image;
 
-pub type TextureId = Uuid;
+pub type TextureId = u64;
 
 pub struct TextureCache {
     textures: HashMap<TextureId, Texture>,
@@ -47,12 +47,12 @@ impl TextureCache {
     pub fn get(&self, tex_id: &TextureId) -> ResourceResult<&Texture> {
         let t = self.textures.get(tex_id);
 
-        match t {
-            Some(tex) => Ok(tex),
+        match t {
+            Some(tex) => Ok(tex),
             None => {
                 Err(ResourceError::new(ResourceNs::Texture,
                                        "error getting texture from cache".to_owned()))
-            }
+            }
         }
 
 

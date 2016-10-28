@@ -5,12 +5,12 @@ use std::result;
 use std::option;
 use std::convert;
 use std::string;
+use std::hash::{Hash, Hasher, SipHasher};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::fs::File;
 
 use ::util;
-use ::uuid::Uuid;
 use ::image;
 
 use glium::backend::glutin_backend::GlutinFacade;
@@ -18,12 +18,12 @@ use glium::texture::{SrgbTexture2d, RawImage2d, PixelValue};
 
 use std::fmt;
 
-pub type ResourceId = Uuid;
-pub type TextureId = Uuid;
+pub type ResourceId = u64;
+pub type TextureId = u64;
 
 pub type ResourceResult<T> = Result<T, ResourceError>;
 
-#[derive(Debug, Copy, PartialEq, Eq, Clone)]
+#[derive(Debug, Copy, PartialEq, Eq, Clone, Hash)]
 pub enum ResourceNs {
     Texture,
 }
@@ -38,9 +38,6 @@ impl fmt::Display for ResourceNs {
 
     }
 }
-
-const NS_GRIMALPHA: &'static str = "89190388-3c77-57cb-b20e-a611d586005a";
-
 
 #[derive(Debug)]
 pub struct ResourceError {
@@ -87,13 +84,15 @@ impl error::Error for ResourceError {
 }
 
 
-pub fn make_resource_id(namespace: ResourceNs, name: &str) -> Uuid {
-    let ns_ga = Uuid::parse_str(NS_GRIMALPHA).unwrap();
+pub fn make_resource_id(namespace: ResourceNs, name: &str) -> ResourceId {
+    let mut h = SipHasher::new();
+    //println!("h: ", h);
+    namespace.hash(&mut h);
+    //println!("h: ", h);
+    name.hash(&mut h);
+    //println!("h: ", h);
 
-    let mut retstr = namespace.to_string();
-    retstr.push_str(name);
-
-    Uuid::new_v5(&ns_ga, retstr.as_str())
+    h.finish()
 }
 
 pub trait Resource {

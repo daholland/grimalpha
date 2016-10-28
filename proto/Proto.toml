@@ -5,5 +5,5 @@ resource_path = "assets/"
 game_config = "game/Game.toml"
 
 [video_config]
-resolution = {x=960, y=540}
+resolution = {x=1280, y=720}
                
