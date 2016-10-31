@@ -128,20 +128,6 @@ impl App {
 
         //shaders
 
-        let vert_shader_src = r#"
-#version 330 core
-in vec3 position;
-in vec2 tex_coords;
-out vec2 v_tex_coords;
-uniform mat4 modelview;
-uniform mat4 projection;
-void main() {
-  v_tex_coords = tex_coords;
-  gl_Position = projection * modelview * vec4(position, 1.0);
-} "#;
-        let frag_shader_src = r#"
- #version 330 core in vec2 v_tex_coords; out vec4 color; uniform sampler2D tex; void main() {   color = texture2D(tex, v_tex_coords); } "#;
-
             let mut path = PathBuf::from(::util::get_curr_dir().unwrap());
             path.push("assets");
             path.push("shaders");
@@ -152,10 +138,7 @@ void main() {
             if let Ok(sid) = program.load(&display) {
                 let _ = resource_sys.shaders.add(sid, Program::from_source(&display, &program.data.vert, &program.data.frag, None).unwrap());
             }
-    
-    for (k, v) in &resource_sys.shaders.shaders {
-        println!("Id: {:?}, Shader: {:?}", k, v);
-    }
+   
 
         
         
@@ -241,7 +224,7 @@ void main() {
 
         // shaders
         let shader = self.resource_sys.get_shader("basic").unwrap();
-        println!("passed into draw: {:?}", shader);
+        // println!("passed into draw: {:?}", shader);
 
         /////////////////////////////
 

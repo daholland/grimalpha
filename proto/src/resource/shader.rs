@@ -144,12 +144,11 @@ impl Shader {
 
 let mut vs = String::new();
 let mut vf = File::open(pathvs.clone()).unwrap();
-vf.read_to_string(&mut vs);
+vf.read_to_string(&mut vs).unwrap();
 
         let mut fs = String::new();
         let mut ff = File::open(pathfs.clone()).unwrap();
-        ff.read_to_string(&mut fs);
-                                  println!("vert: {:?}, frag: {:?}", vs, fs);
+        ff.read_to_string(&mut fs).unwrap();
 
         
 
