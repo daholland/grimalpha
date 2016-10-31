@@ -1,0 +1,15 @@
+* Grim Alpha
+
+A Rust and Wren 2d Game Engine
+
+Features:
+** log
+** engine
+** event based
+** components
+** wren scripting engine for ui/game
+** dev tool/editor for map/script/entities
+** animation support / toolchain
+** cross platform
+
+

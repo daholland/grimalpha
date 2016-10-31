@@ -8,7 +8,9 @@ use glium::backend::glutin_backend::GlutinFacade;
 use imgui::{ImGui, ImGuiKey, Ui};
 use imgui::glium_renderer::Renderer;
 use self::time::SteadyTime;
+use glium::program::{Program, Binary, ProgramCreationInput};
 
+use std::rc::Rc;
 
 use steamworks::SteamAPI;
 
@@ -23,7 +25,6 @@ pub struct App {
     pub ui_sys: ImGui,
     pub ui_state: ui::UiState,
     renderer: Renderer,
-    shader: glium::Program,
     pub steam_api: Option<SteamAPI>,
     log: (),
     event_sys: (),
@@ -82,7 +83,7 @@ impl App {
         imgui.set_imgui_key(ImGuiKey::A, 0);
 
         let mut resource_sys =
-            resource::ResourceManager { textures: resource::texture::TextureCache::new() };
+            resource::ResourceManager { textures: resource::texture::TextureCache::new(), shaders: resource::shader::ShaderCache::new() };
 // TODO: use config file for asset base directories
         {
             
@@ -123,46 +124,42 @@ impl App {
                      ::std::mem::size_of::<usize>());
 
             let _ = resource_sys.textures.add(tex_id, texture);
-        } 
+        }
 
+        //shaders
 
         let vert_shader_src = r#"
 #version 330 core
-
 in vec3 position;
 in vec2 tex_coords;
 out vec2 v_tex_coords;
-
 uniform mat4 modelview;
 uniform mat4 projection;
-
 void main() {
-
-v_tex_coords = tex_coords;
-
-gl_Position = projection * modelview * vec4(position, 1.0);
-
-}
-"#;
+  v_tex_coords = tex_coords;
+  gl_Position = projection * modelview * vec4(position, 1.0);
+} "#;
         let frag_shader_src = r#"
-#version 330 core
-in vec2 v_tex_coords;
+ #version 330 core in vec2 v_tex_coords; out vec4 color; uniform sampler2D tex; void main() {   color = texture2D(tex, v_tex_coords); } "#;
 
-out vec4 color;
+            let mut path = PathBuf::from(::util::get_curr_dir().unwrap());
+            path.push("assets");
+            path.push("shaders");
+            path.push("basic");
 
-uniform sampler2D tex;
+            let mut program = resource::shader::Shader::new(&display,"basic", path);
 
+            if let Ok(sid) = program.load(&display) {
+                let _ = resource_sys.shaders.add(sid, Program::from_source(&display, &program.data.vert, &program.data.frag, None).unwrap());
+            }
+    
+    for (k, v) in &resource_sys.shaders.shaders {
+        println!("Id: {:?}, Shader: {:?}", k, v);
+    }
 
-void main() {
-  color = texture2D(tex, v_tex_coords);
+        
+        
 
-
-
-}
-"#;
-
-        let program = glium::Program::from_source(&display, vert_shader_src, frag_shader_src, None)
-            .unwrap();
 
         App {
             display: display.clone(),
@@ -173,7 +170,6 @@ void main() {
             },
             renderer: renderer,
             last_frame: SteadyTime::now(),
-            shader: program,
             steam_api: None,
             log: (),
             event_sys: (),
@@ -208,11 +204,15 @@ void main() {
         use glium::uniforms::*;
 
 
+
         let now = SteadyTime::now();
         let delta = now - self.last_frame;
         let delta_f = delta.num_nanoseconds().unwrap() as f32 / 1_000_000_000.0;
         self.last_frame = now;
         self.update_mouse();
+
+
+
 
 
        
@@ -238,6 +238,13 @@ void main() {
             viewport: Some(Rect{left: 0, bottom: 0, width: 960, height: 540}),
             .. Default::default()
         };
+
+        // shaders
+        let shader = self.resource_sys.get_shader("basic").unwrap();
+        println!("passed into draw: {:?}", shader);
+
+        /////////////////////////////
+
         {
             let shape = glium::vertex::VertexBuffer::new(&self.display, &[
                 ::SpriteVertex { position: [0.0,  0.0, 0.0], tex_coords: [0.0, 0.0] },
@@ -248,6 +255,7 @@ void main() {
             ]).unwrap();
             
             let landtexture = self.resource_sys.get_raw_texture("4x4").unwrap();
+
             let (tex_x, tex_y) = (landtexture.get_width(), landtexture.get_height().unwrap());
             let sampler = Sampler(landtexture, SamplerBehavior {
                 minify_filter: MinifySamplerFilter::Nearest,
@@ -260,7 +268,7 @@ void main() {
 
             let mut x = 0.0f32;
             while x < 20.0 {
-                println!("x: {:?}", x);
+                //println!("x: {:?}", x);
                 let offset = cgmath::Matrix4::from_translation((((tex_x as f32)*(x as f32)), 0.0, 0.0f32).into());
                 let world = translate.concat(&scale).concat(&offset);
                 let combined: [[f32; 4]; 4] = (view * world).into();
@@ -271,9 +279,10 @@ void main() {
                     tex: sampler,
                     projection: projection
                 };
+
                 target.draw(&shape,
                             glium::index::NoIndices(glium::index::PrimitiveType::TriangleStrip),
-                            &self.shader,
+                            shader,
                             &uniforms,
                             &params)
                     .unwrap();
@@ -305,9 +314,11 @@ void main() {
                 tex: mantexture,
                 projection: projection
             };
+
+
             target.draw(&shape,
                         glium::index::NoIndices(glium::index::PrimitiveType::TriangleStrip),
-                        &self.shader,
+                        shader,
                         &manuniforms,
                         &params)
                 .unwrap();
