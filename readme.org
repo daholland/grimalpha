@@ -1,6 +1,6 @@
 * Grim Alpha
 
-A Rust and Wren 2d Game Engine
+A (very much WIP) Rust and Wren 2d Game Engine. most action has been taking place in `proto/` so far as I refactor and get a barebones engine going
 
 Features:
 ** log
