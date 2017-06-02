@@ -67,8 +67,23 @@ fn main() {
                 if let Event::MouseInput(state, MouseButton::Left) = ev {
                     app.input_state.mouse.buttons.0 = state == ElementState::Pressed
                 }
+                if let Event::MouseInput(state, MouseButton::Right) = ev {
+                    app.input_state.mouse.buttons.2 = state == ElementState::Pressed
+                }
+                if let Event::MouseInput(state, MouseButton::Middle) = ev {
+                    app.input_state.mouse.buttons.1 = state == ElementState::Pressed
+                }
 
-                // println!("mouse (x,y): {:?}", app.input_state.mouse.pos);
+                if let Event::MouseInput(state, MouseButton::Other(button_idx)) = ev {
+                    //TODO: Fix input::MouseState to have 5 bools
+                    let extra_button_name = match button_idx {
+                        // Back
+                        1 => app.input_state.mouse.buttons.3 = state == ElementState::Pressed,
+                        // Forward
+                        2 => app.input_state.mouse.buttons.4 = state == ElementState::Pressed,
+                        _ => (),
+                    };
+                }
 
             }
         }

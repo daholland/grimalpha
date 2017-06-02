@@ -150,6 +150,7 @@ impl App {
             ui_state: ui::UiState {
                 colorpick: [0.0, 0.0, 0.0, 0.0],
                 show_color_window: true,
+                mouse_state: input::MouseState::default()
             },
             renderer: renderer,
             last_frame: SteadyTime::now(),
@@ -161,7 +162,7 @@ impl App {
             input_state: input::InputState {
                 mouse: input::MouseState {
                     pos: (0, 0),
-                    buttons: (false, false, false),
+                    buttons: (false, false, false, false, false),
                 },
             },
         }
@@ -173,8 +174,10 @@ impl App {
         self.ui_sys.set_mouse_down(&[self.input_state.mouse.buttons.0,
                                      self.input_state.mouse.buttons.1,
                                      self.input_state.mouse.buttons.2,
-                                     false,
-                                     false]);
+                                     self.input_state.mouse.buttons.3,
+                                     self.input_state.mouse.buttons.4]);
+
+        self.ui_state.mouse_state = self.input_state.mouse.clone();
     }
 
     pub fn render<F: FnMut(&Ui, &mut ui::UiState)>(&mut self,

@@ -2,9 +2,10 @@ pub struct InputState {
     pub mouse: MouseState,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
 pub struct MouseState {
     pub pos: (i32, i32),
-    pub buttons: (bool, bool, bool),
+    pub buttons: (bool, bool, bool, bool, bool),
 }
 
 #[cfg(feature = "xinput")]
