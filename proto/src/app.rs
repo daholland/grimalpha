@@ -1,12 +1,12 @@
 extern crate glium;
 extern crate time;
 extern crate imgui_sys;
+extern crate imgui_glium_renderer;
 extern crate cgmath;
 
 // TODO: split out into own mod for Support/Systems holder
-use glium::backend::glutin_backend::GlutinFacade;
 use imgui::{ImGui, ImGuiKey, Ui};
-use imgui::glium_renderer::Renderer;
+use imgui_glium_renderer::Renderer;
 use self::time::SteadyTime;
 use glium::program::{Program, Binary, ProgramCreationInput};
 
@@ -21,7 +21,7 @@ use ::resource;
 
 pub struct App {
     last_frame: SteadyTime,
-    pub display: GlutinFacade,
+    pub display: glium::backend::glutin_backend::GlutinFacade,
     pub ui_sys: ImGui,
     pub ui_state: ui::UiState,
     renderer: Renderer,
